@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Pixeltest</title>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/keyboardjs/2.4.1/keyboard.min.js"></script>
+	<style>
+		canvas{
+			position:absolute;
+			top:0;
+			left:0;
+
+		}
+
+		div.color-picker{
+			position: absolute;
+			bottom:0;
+			left:0;
+		}
+
+		div.color-picker input{
+			display: inline-block;
+			padding:0;
+			height:25px;
+			width:25px;
+			border: none;
+		}
+
+		#current-color{
+			position: absolute;
+			height:50px;
+			width:50px;
+			bottom:0;
+			right:0;
+		}
+	</style>
+</head>
+<body>
+	<canvas id="trace-canvas"></canvas>
+	<canvas id="draw-canvas"></canvas>
+	<canvas id="cursor-canvas"></canvas>
+	<div class="color-picker" id="color-picker"></div>
+	<div id="current-color"></div>
+
+	<script>
+		var traceImg = new Image();
+		var traceScale = 1;
+		var mode = 'normal'
+
+		var cursor = {
+			x: 0,
+			y: 0
+		};
+
+		var color = {
+			r: 255,
+			g: 0,
+			b: 0,
+			a: 255
+		};
+
+		var auto = false;
+
+		var colors = {
+			'q' : {r:0,g:0,b:0,a:255},
+			'w' : {r:128,g:128,b:128,a:255},
+			'e' : {r:64,g:0,b:64,a:255},
+			'r' : {r:255,g:0,b:0,a:255},
+			't' : {r:255,g:128,b:64,a:255},
+			'y' : {r:255,g:255,b:0,a:255},
+			'u' : {r:0,g:128,b:0,a:255},
+			'i' : {r:0,g:0,b:255,a:255},
+			'o' : {r:0,g:0,b:128,a:255},
+			'p' : {r:128,g:0,b:128,a:255},
+			'a' : {r:255,g:255,b:255,a:255},
+			's' : {r:192,g:192,b:192,a:255},
+			'd' : {r:128,g:64,b:0,a:255},
+			'f' : {r:255,g:128,b:192,a:255},
+			'g' : {r:255,g:128,b:64,a:255},
+			'h' : {r:255,g:255,b:128,a:255},
+			'j' : {r:128,g:255,b:0,a:255},
+			'k' : {r:128,g:255,b:255,a:255},
+			'l' : {r:128,g:128,b:255,a:255},
+			';' : {r:64,g:0,b:128,a:255},
+			'z' : {r:0,g:0,b:0,a:255},
+			'x' : {r:0,g:0,b:0,a:255},
+			'c' : {r:0,g:0,b:0,a:255},
+			'v' : {r:0,g:0,b:0,a:255},
+			'b' : {r:0,g:0,b:0,a:255},
+			'n' : {r:0,g:0,b:0,a:255},
+			'm' : {r:0,g:0,b:0,a:255},
+			',' : {r:0,g:0,b:0,a:255},
+			'.' : {r:0,g:0,b:0,a:255},
+			'/' : {r:0,g:0,b:0,a:255}
+		}
+
+		var lastKey = '';
+		
+		var c = document.getElementById("draw-canvas");
+		var d = document.getElementById("cursor-canvas");
+		var t = document.getElementById("trace-canvas");
+
+		var drawCtx = c.getContext("2d");
+		var cursorCtx = d.getContext("2d");
+		var traceCtx = t.getContext("2d");
+		var returnSpot;
+
+		c.width  = window.innerWidth;
+		c.height = window.innerHeight;
+
+		d.width  = window.innerWidth;
+		d.height = window.innerHeight;
+
+		t.width  = window.innerWidth;
+		t.height = window.innerHeight;
+
+
+		drawCursor();
+
+		keyboardJS.bind('num9', function(e) {
+			lastKey = 'num9';
+			cursor.y = cursor.y - 10;	
+		  	cursor.y = Math.max(cursor.y,0);
+
+		  	cursor.x = cursor.x +10;	
+			cursor.x = Math.min(cursor.x,d.width);
+		  	drawCursor()
+		});	
+
+		keyboardJS.bind('up', function(e) {
+			lastKey = 'num8';
+			cursor.y = cursor.y -10;	
+		  	cursor.y = Math.max(cursor.y,0);
+		  	drawCursor()
+		});
+
+		keyboardJS.bind('num8', function(e) {
+			lastKey = 'num8';
+			cursor.y = cursor.y -10;	
+		  	cursor.y = Math.max(cursor.y,0);
+		  	drawCursor()
+		});
+
+		keyboardJS.bind('num7', function(e) {
+			lastKey = 'num7';
+			cursor.y = cursor.y - 10;	
+		  	cursor.y = Math.max(cursor.y,0);
+
+		  	cursor.x = cursor.x -10;	
+			cursor.x = Math.max(cursor.x,0);
+		  	drawCursor()
+		});	
+
+		keyboardJS.bind('right', function(e) {
+			lastKey = 'num6';
+			cursor.x = cursor.x +10;	
+		  	cursor.x = Math.min(cursor.x,d.width);
+		  	drawCursor()
+		});
+
+		keyboardJS.bind('num6', function(e) {
+			lastKey = 'num6';
+			cursor.x = cursor.x +10;	
+		  	cursor.x = Math.min(cursor.x,d.width);
+		  	drawCursor()
+		});		
+
+		keyboardJS.bind('space', function(e) {
+			drawPixel();
+
+			keyboardJS.releaseAllKeys();
+			
+			if(auto){
+				setTimeout(function(){
+					keyboardJS.pressKey(lastKey)
+					keyboardJS.releaseKey(lastKey)
+					
+				},1)
+			}
+
+		});
+
+		keyboardJS.bind('num5', function(e) {
+			drawPixel();
+			keyboardJS.releaseAllKeys();
+			
+			if(auto){
+				setTimeout(function(){
+					keyboardJS.pressKey(lastKey)
+					keyboardJS.releaseKey(lastKey)
+					
+				},1)
+			}
+		});
+		
+		keyboardJS.bind('left', function(e) {
+			lastKey = 'num4';
+			cursor.x = cursor.x -10;	
+		  	cursor.x = Math.max(cursor.x,0);
+		  	drawCursor()
+		});
+
+		keyboardJS.bind('num4', function(e) {
+			lastKey = 'num4';
+			cursor.x = cursor.x -10;	
+		  	cursor.x = Math.max(cursor.x,0);
+		  	drawCursor()
+		});
+
+		keyboardJS.bind('num3', function(e) {
+			lastKey = 'num3';
+			cursor.y = cursor.y + 10;	
+		  	cursor.y = Math.min(cursor.y,d.height);
+
+		  	cursor.x = cursor.x +10;	
+			cursor.x = Math.min(cursor.x,d.width);
+		  	drawCursor()
+		});	
+
+		keyboardJS.bind('down', function(e) {
+			lastKey = 'num2';
+			cursor.y = cursor.y + 10;	
+		  	cursor.y = Math.min(cursor.y,d.height);
+		  	drawCursor()
+		});
+
+		keyboardJS.bind('num2', function(e) {
+			lastKey = 'num2';
+			cursor.y = cursor.y + 10;	
+		  	cursor.y = Math.min(cursor.y,d.height);
+		  	drawCursor()
+		});		
+
+		keyboardJS.bind('num1', function(e) {
+			lastKey = 'num1';
+			cursor.y = cursor.y + 10;	
+		  	cursor.y = Math.min(cursor.y,d.height);
+
+		  	cursor.x = cursor.x -10;	
+			cursor.x = Math.max(cursor.x,0);
+		  	drawCursor()
+		});		
+
+		keyboardJS.bind('ctrl + s',function(e){
+			e.preventDefault();
+			saveImage();
+		});
+
+		keyboardJS.bind('ctrl + l',function(e){
+			e.preventDefault();
+			loadImage();
+		});
+
+		keyboardJS.bind('ctrl + num-',function(e){
+			if(confirm('Clear canvas?')){
+				drawCtx.clearRect(0, 0, d.width, d.height);
+				drawCtx.beginPath();
+			}
+		});		
+
+		keyboardJS.bind('shift',function(e){
+			$('#color-picker').toggle();
+		});
+
+		keyboardJS.bind('tab',function(e){
+			e.preventDefault();
+			auto = !auto;	
+		});
+
+		keyboardJS.bind('num-',function(e){
+			erasePixel()
+		});
+
+		keyboardJS.bind('equal',function(e){
+			traceScale = Math.floor((traceScale + 0.11) *10) /10;
+			console.log(traceScale)
+			t.width = traceImg.width * traceScale;
+		    t.height = traceImg.height * traceScale;
+		    traceCtx.scale(traceScale,traceScale);
+		    traceCtx.drawImage(traceImg, 0, 0);
+
+		});
+
+		keyboardJS.bind('-',function(e){
+			traceScale = Math.floor((traceScale - 0.11) *10) /10;
+			console.log(traceScale)
+			t.width = traceImg.width * traceScale;
+		    t.height = traceImg.height * traceScale;
+		    traceCtx.scale(traceScale,traceScale);
+		    traceCtx.drawImage(traceImg, 0, 0);
+
+		});
+
+		keyboardJS.bind('delete',function(e){
+			erasePixel()
+		});
+
+		keyboardJS.bind('capslock',function(e){
+			e.preventDefault();
+
+			if(mode=='normal'){
+				$('#draw-canvas').css('opacity',0.7);
+				$('#trace-canvas').css('opacity',1);
+				mode = 'draw-trans';
+			} else if(mode=='draw-trans'){
+				$('#draw-canvas').css('opacity',1);
+				$('#trace-canvas').css('opacity',0.7);
+				mode = 'trace-trans';
+			} else if(mode=='trace-trans'){
+				$('#draw-canvas').css('opacity',1);
+				$('#trace-canvas').css('opacity',1);
+				mode = 'normal';
+			}
+
+
+		});
+
+		keyboardJS.bind('numadd',function(e){
+			returnSpot = { x: cursor.x+0,y:cursor.y+0};
+		});		
+
+		keyboardJS.bind('enter',function(e){
+			cursor = {x:returnSpot.x+0,y:returnSpot.y+0};
+			drawCursor();
+		});
+
+		for(var keyColor in colors){
+			keyboardJS.bind(keyColor,function(e){
+				var key = e.key.toLowerCase();
+				color = colors[key];
+				$('#current-color').css('background-color',rgbToHex(color));
+			});
+		}
+
+		$('#current-color').css('background-color',rgbToHex(color));
+
+		drawColorPickers();
+
+		traceImg.addEventListener('load', function() {
+			traceScale = 1;
+		    t.width = traceImg.width;
+		    t.height = traceImg.height;
+		    traceCtx.drawImage(traceImg, 0, 0);
+		}, false);
+
+		d.addEventListener("dragover", function(evt) {
+		    evt.preventDefault();
+		}, false);
+
+		d.addEventListener("drop", function(evt) {
+		    var files = evt.dataTransfer.files;
+
+		    if (files.length > 0) {
+		        var file = files[0];
+
+		        if (typeof FileReader !== "undefined" && file.type.indexOf("image") != -1) {
+		            var reader = new FileReader();
+
+		            reader.onload = function(evt) {
+		                traceImg.src = evt.target.result;
+		            };
+
+		            reader.readAsDataURL(file);
+		        }
+		    }
+
+		    evt.preventDefault();
+		}, false);
+
+		function saveImage(){
+			localStorage.setItem("pic", drawCtx.canvas.toDataURL("image/png"));
+		}
+
+		function loadImage(){
+			var img = new Image();
+			img.onload = function(){
+				drawCtx.drawImage(img,0,0);
+			};
+			img.src = localStorage.getItem('pic');
+		}
+
+		function drawColorPickers(){
+			var count =1;
+			var row = '';
+			for(var keyColor in colors){
+				if(count%10==1){
+					row = $('<div></div>').appendTo("#color-picker");
+				}
+				$('<input />').attr('type','color').attr('data-key',keyColor).val(rgbToHex(colors[keyColor])).change(function(){
+					var key = $(this).data('key');
+					var color = hexToRgb($(this).val());
+
+					colors[key] = color;
+				}).appendTo(row);
+
+				count++;
+			}
+			
+			$('#color-picker').fadeOut();
+		}
+
+		function rgbToHex(color){
+			return "#" + toHex(color.r) + toHex(color.g) + toHex(color.b);
+
+		}
+
+		function hexToRgb(hex) {
+
+		    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+
+		    if (result) {
+		        return {
+		            r: parseInt(result[1], 16),
+		            g: parseInt(result[2], 16),
+		            b: parseInt(result[3], 16),
+		            a: 255
+		        }
+		    }
+
+		    return {r:0,g:0,b:0,a:255};
+	    }	
+
+		function toHex(rgb){
+
+		    var hex = Number(rgb).toString(16);
+		    if (hex.length < 2) {
+		        hex = "0" + hex;
+		    }
+		    return hex;
+		}
+
+		function erasePixel(){
+			
+			drawCtx.clearRect( cursor.x, cursor.y, 10, 10 );
+			cursorCtx.beginPath();
+		}
+
+		function drawCursor(){
+			var data = drawCtx.getImageData(cursor.x, cursor.y, 1, 1).data;
+
+			var cursorColor = 'rgb(' + (255-data[0]) +',' +  (255-data[1]) +','+  (255-data[2]) + ')';
+			if(data[3] == 0) cursorColor = 'rgb(0,0,0)';
+			cursorCtx.strokeStyle=cursorColor;
+			cursorCtx.clearRect(0, 0, d.width, d.height);
+			cursorCtx.beginPath();
+			cursorCtx.rect(cursor.x,cursor.y,10,10);
+			cursorCtx.stroke();
+		}
+
+		function drawPixel(){
+			drawCtx.fillStyle = "rgba("+color.r+","+color.g+","+color.b+","+(color.a/255)+")";
+			drawCtx.fillRect( cursor.x, cursor.y, 10, 10 );
+		}
+	</script>
+</body>
+</html>
